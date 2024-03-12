@@ -1,0 +1,160 @@
+﻿<div class="container mt-3">
+    <div class="row">
+        <!-- Attendance Data Report Section -->
+        <div class="col-md-6">
+            <h4>Attendance Data Report</h4>
+            <hr>
+
+            <div class="form-group">
+                <label for="startDate">Start Date:</label>
+                <input type="date" id="startDate" class="form-control">
+            </div>
+
+            <div class="form-group">
+                <label for="endDate">End Date:</label>
+                <input type="date" id="endDate" class="form-control">
+            </div>
+
+            <button onclick="previewData()" class="btn btn-primary">Preview</button>
+        </div>
+
+        <!-- Attendance Status Report Section -->
+        <div class="col-md-6">
+            <h4>Attendance Status Report</h4>
+            <hr>
+
+            <div class="form-group">
+                <label for="startDate2">Start Date:</label>
+                <input type="date" id="startDate2" class="form-control">
+            </div>
+
+            <div class="form-group">
+                <label for="endDate2">End Date:</label>
+                <input type="date" id="endDate2" class="form-control">
+            </div>
+
+            <button onclick="previewData2()" class="btn btn-primary">Preview</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    function previewData() {
+        var startDate = document.getElementById("startDate").value;
+        var endDate = document.getElementById("endDate").value;
+        var url = "/Home/GetAttendanceData?startDate=" + startDate + "&endDate=" + endDate;
+
+        $.ajax({
+            type: 'GET',
+            url: url,
+            dataType: 'json',
+            success: function (response) {
+                if (response != null && response.DataRows != null && response.DataRows.length > 0) {
+                    var startDate = document.getElementById("startDate").value;
+                    var endDate = document.getElementById("endDate").value;
+                    exportJsonToExcel(startDate, endDate, response.DataRows, "AttendanceData");
+                }
+            },
+            error: function (response) {
+                console.error(response);
+            }
+        });
+    }
+
+    function exportJsonToExcel(startDate, endDate, excelData, fileName) {
+        const wb = XLSX.utils.book_new();
+        const ws = XLSX.utils.aoa_to_sheet([['EmployeeId', 'Name', 'Location', 'DesignationName', 'DepartmentName']]);
+
+        // Dynamically add formatted date headers
+        const start = new Date(startDate);
+        const end = new Date(endDate);
+        const dateHeaders = [];
+
+        for (let currentDate = new Date(start); currentDate <= end; currentDate.setDate(currentDate.getDate() + 1)) {
+            const formattedDate = currentDate.toLocaleDateString('en-GB'); // Format date as 'dd/MM/yyyy'
+            dateHeaders.push(formattedDate);
+        }
+
+        const headers = ['EmployeeId', 'Name', 'Location', 'DesignationName', 'DepartmentName'].concat(dateHeaders);
+        XLSX.utils.sheet_add_aoa(ws, [headers]);
+
+        XLSX.utils.sheet_add_json(ws, excelData, { origin: 'A2', skipHeader: true });
+        XLSX.utils.book_append_sheet(wb, ws, "Sheet1");
+        XLSX.writeFile(wb, fileName + '.xlsx');
+    }
+
+    // ------ Attandance Status Report ----------//
+
+    function previewData2() {
+        var startDate = document.getElementById("startDate2").value;
+        var endDate = document.getElementById("endDate2").value;
+        var url = "/Home/GetAttendanceStatusReport?startDate=" + startDate + "&endDate=" + endDate;
+
+        $.ajax({
+            type: 'GET',
+            url: url,
+            dataType: 'json',
+            success: function (response) {
+                console.log(response);
+                if (response != null && response.DataRows != null && response.DataRows.length > 0) {
+                    var startDate = document.getElementById("startDate2").value;
+                    var endDate = document.getElementById("endDate2").value;
+                    exportJsonToExcel2(startDate, endDate, response.DataRows, "AttendanceStatusReport");
+                }
+            },
+            error: function (response) {
+                console.error(response);
+            }
+        });
+    }
+
+    function exportJsonToExcel2(startDate, endDate, excelData, fileName) {
+        const start = new Date(startDate);
+        const end = new Date(endDate);
+        const dateHeaders = [];
+        const dateColumnHeaders = [];
+
+        for (let currentDate = new Date(start); currentDate <= end; currentDate.setDate(currentDate.getDate() + 1)) {
+            const formattedDate = currentDate.toLocaleDateString('en-GB'); // Format date as 'dd/MM/yyyy'
+            //header 1 row :  Dynamically add formatted date headers
+            dateHeaders.push(formattedDate);
+            dateHeaders.push('');
+            dateHeaders.push('');
+            dateHeaders.push('');
+            dateHeaders.push('');
+            //header 2 row : :  Dynamically add formatted date columns headers
+            dateColumnHeaders.push('InTime');
+            dateColumnHeaders.push('OutTime');
+            dateColumnHeaders.push('Early');
+            dateColumnHeaders.push('Late');
+            dateColumnHeaders.push('Status');
+        }
+        const header1 = ['EmployeeId', 'Name', 'Location', 'DesignationName', 'DepartmentName', 'ShiftName'].concat(dateHeaders);
+        let header2 = ['', ' ', ' ', ' ', ' ', ' '].concat(dateColumnHeaders);
+        let columnsHead = [header1, header2]
+
+        const wb = XLSX.utils.book_new();
+        const ws = XLSX.utils.json_to_sheet([]);
+        XLSX.utils.sheet_add_aoa(ws, columnsHead);
+        XLSX.utils.sheet_add_json(ws, excelData, { origin: 'A' + columnsHead.count, skipHeader: true });
+
+        // Merge cells for each date column
+        const merges = [];
+        for (let i = 0; i < dateHeaders.length; i += 5) {
+            const startColumn = i + 6;
+            const endColumn = i + 10;
+            const startRow = 0;
+            const endRow = 0;
+            merges.push({ s: { r: startRow, c: startColumn }, e: { r: endRow, c: endColumn } });
+        }
+        ws['!merges'] = merges;
+
+        // Center align the entire header row
+        ws['!cols'] = [{ width: 15, alignment: { horizontal: 'center', vertical: 'center' } }];
+
+        XLSX.utils.book_append_sheet(wb, ws, "Sheet1");
+        XLSX.writeFile(wb, fileName + '.xlsx');
+    }
+</script>
+
+<script lang="javascript" src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
